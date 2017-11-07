@@ -28,35 +28,32 @@ class OrdersDrawer {
     const lines = graph.append('g').selectAll('g').data(this.orders);
     lines.exit().remove();
 
-    const drawOrderLines = this.drawOrderLines.bind(this);
+    const drawOrderLinesFunc = this.drawOrderLines.bind(this); // bleh
     lines.enter().append('g').each(function(order) {
       const group = d3.select(this);
-      drawOrderLines(group, order);
+      drawOrderLinesFunc(group, order);
     });
   }
 
   drawOrderLines(group, order) {
-    let currentQuantityEvents = [];
-    
-    order.history.forEach((event, i) => {
-      if (i == 0) {
-        currentQuantityEvents.push(event);
-        return;
-      }
+    let history = Array.from(order.history);
 
-      if (_.last(currentQuantityEvents).quantity == event.quantity) {
-        currentQuantityEvents.push(event);
-      } else {
-        currentQuantityEvents.push(event);
+    const last = Object.assign({}, _.last(history), {timestamp: order.lastActiveAt});
+    history.push(last);
+
+    let currentQuantityEvents = [_.first(history)];
+
+    _.rest(history).forEach((event, i) => {
+      const sameQuantity = (_.last(currentQuantityEvents).quantity == event.quantity);
+      currentQuantityEvents.push(event);
+
+      if (!sameQuantity) {
         this.drawQuantityLine(group, currentQuantityEvents);
 
-        currentQuantityEvents = [];
-        currentQuantityEvents.push(event);
+        currentQuantityEvents = [event];
       }
     });
 
-    const last = Object.assign({}, _.last(order.history), {timestamp: order.lastActiveAt});
-    currentQuantityEvents.push(last);
     this.drawQuantityLine(group, currentQuantityEvents);
   }
 
