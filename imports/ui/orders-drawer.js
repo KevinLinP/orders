@@ -12,7 +12,7 @@ class OrdersDrawer {
     this.topMargin = 10;
 
     this.xScale = d3.scaleTime().domain([new Date('2017-10-30'), new Date()]).range([this.yAxisWidth, this.totalWidth]).clamp(true);
-    this.yScale = d3.scaleLinear().domain([600, 1400]).range([this.graphHeight, 0]);
+    this.yScale = d3.scaleLinear().domain([500, 1400]).range([this.graphHeight, 0]);
     this.lineDescriber = d3.line().curve(d3.curveStepAfter).x((d) => {return this.xScale(d.timestamp)}).y((d) => {return this.yScale(d.price)});
   }
 
@@ -25,24 +25,48 @@ class OrdersDrawer {
   }
 
   drawLines(graph) {
-    const lines = graph.append('g').selectAll('path').data(this.orders);
+    const lines = graph.append('g').selectAll('g').data(this.orders);
     lines.exit().remove();
 
-    lines.enter().append('path').attr('fill', 'none')
-      .attr('stroke', (d) => {
-        const last = _.last(d.history);
-        const opacity = 0.05 * last.quantity;
+    const drawOrderLines = this.drawOrderLines.bind(this);
+    lines.enter().append('g').each(function(order) {
+      const group = d3.select(this);
+      drawOrderLines(group, order);
+    });
+  }
 
-        return `rgba(0, 0, 0, ${opacity})`;
-      })
-      .attr('d', (d) => {
-        const history = Array.from(d.history);
+  drawOrderLines(group, order) {
+    let currentQuantityEvents = [];
+    
+    order.history.forEach((event, i) => {
+      if (i == 0) {
+        currentQuantityEvents.push(event);
+        return;
+      }
 
-        const last = Object.assign({}, _.last(history), {timestamp: d.lastActiveAt});
-        history.push(last);
+      if (_.last(currentQuantityEvents).quantity == event.quantity) {
+        currentQuantityEvents.push(event);
+      } else {
+        currentQuantityEvents.push(event);
+        this.drawQuantityLine(group, currentQuantityEvents);
 
-        return this.lineDescriber(history);
-      });
+        currentQuantityEvents = [];
+        currentQuantityEvents.push(event);
+      }
+    });
+
+    const last = Object.assign({}, _.last(order.history), {timestamp: order.lastActiveAt});
+    currentQuantityEvents.push(last);
+    this.drawQuantityLine(group, currentQuantityEvents);
+  }
+
+  drawQuantityLine(group, events) {
+    group.append('path').attr('fill', 'none').attr('stroke', () => {
+      const opacity = 0.05 * _.first(events).quantity;
+      return `rgba(0, 0, 0, ${opacity})`;
+    }).attr('d', () => {
+      return this.lineDescriber(events);
+    });
   }
 
   drawAxes(graph) {
